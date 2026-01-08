@@ -1,9 +1,9 @@
 import { Text, View } from "react-native";
 
-export default function HelpDeskModal() {
+export default function HelpDeskScreen() {
   return (
     <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-      <Text>Help Desk Modal</Text>
+      <Text>Help Desk Screen</Text>
     </View>
   );
 }

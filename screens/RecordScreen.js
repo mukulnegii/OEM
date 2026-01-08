@@ -1,9 +1,9 @@
 import { Text, View } from "react-native";
 
-export default function RecordScreen() {
+export default function RecordsScreen() {
   return (
     <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-      <Text>Record Screen</Text>
+      <Text>Records Screen</Text>
     </View>
   );
 }

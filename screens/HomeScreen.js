@@ -1,13 +1,13 @@
 import { useNavigation } from "@react-navigation/native";
 import { useState } from "react";
 import {
-    Dimensions,
-    Image,
-    Modal,
-    ScrollView,
-    Text,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  Image,
+  Modal,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import { COLORS } from "../constants/colors";
@@ -27,7 +27,7 @@ export default function HomeScreen() {
   // 📅 Appointment Data (dummy)
   const appointments = {
     "2026-01-05": [
-      { time: "10:00 AM", title: "Oil Change" },
+      { time: "11:00 AM", title: "Oil Change" },
       { time: "03:00 PM", title: "Brake Check" },
     ],
     "2026-01-12": [
