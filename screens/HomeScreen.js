@@ -1,74 +1,118 @@
-import { useNavigation } from "@react-navigation/native";
-import { useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
-    Dimensions,
-    Image,
-    Modal,
-    ScrollView,
-    Text,
-    TouchableOpacity,
-    View,
+  useFocusEffect,
+  useNavigation,
+} from "@react-navigation/native";
+import { useCallback, useState } from "react";
+import {
+  Dimensions,
+  Image,
+  Modal,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+  ActivityIndicator,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import { COLORS } from "../constants/colors";
 
 const { width } = Dimensions.get("window");
+const IMAGE_HEIGHT = Math.round(width * 0.56);
 
 export default function HomeScreen() {
   const navigation = useNavigation();
 
-  const [activeCarIndex, setActiveCarIndex] = useState(0);
+  const [vehicles, setVehicles] = useState([]);
+  const [appointments, setAppointments] = useState({});
   const [selectedDate, setSelectedDate] = useState(null);
-  const [showModal, setShowModal] = useState(false);
 
-  // 🔽 NEW STATES (Health Check)
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [showVehicleModal, setShowVehicleModal] = useState(false);
   const [showHealthModal, setShowHealthModal] = useState(false);
-  const [selectedCar, setSelectedCar] = useState(null);
 
-  const cars = [
-    require("../assets/Fortuner.jpeg"),
-    require("../assets/Carens.jpg"),
-  ];
+  const [selectedVehicle, setSelectedVehicle] = useState(null);
+  const [activeHealthIndex, setActiveHealthIndex] = useState(0);
 
-  // 🧠 Dummy Health Data (Frontend only)
-  const healthData = {
-    Fortuner: {
-      Engine: "Good",
-      Battery: "Excellent",
-      Brakes: "Average",
-    },
-    Carens: {
-      Engine: "Average",
-      Battery: "Good",
-      Brakes: "Good",
-    },
+  /* 🔹 ML States (from Code 2) */
+  const [loadingHealth, setLoadingHealth] = useState(false);
+  const [healthData, setHealthData] = useState(null);
+
+  /* 🔹 Load data on focus */
+  useFocusEffect(
+    useCallback(() => {
+      loadVehicles();
+      loadAppointments();
+    }, [])
+  );
+
+  const loadVehicles = async () => {
+    try {
+      const data = await AsyncStorage.getItem("VEHICLES");
+      setVehicles(data ? JSON.parse(data) : []);
+    } catch (e) {
+      console.log(e);
+    }
   };
 
-  // 📅 Appointment Data
-  const appointments = {
-    "2026-01-05": [
-      { time: "11:00 AM", title: "Oil Change" },
-      { time: "03:00 PM", title: "Brake Check" },
-    ],
-    "2026-01-12": [{ time: "11:30 AM", title: "Engine Diagnostics" }],
-    "2026-01-21": [{ time: "02:00 PM", title: "Wheel Alignment" }],
+  const loadAppointments = async () => {
+    try {
+      const data = await AsyncStorage.getItem("APPOINTMENTS");
+      setAppointments(data ? JSON.parse(data) : {});
+    } catch (e) {
+      console.log(e);
+    }
   };
 
+  /* 🔹 ML Fetch Function */
+  const fetchHealthData = async (vehicle) => {
+    setLoadingHealth(true);
+    setHealthData(null);
+
+    try {
+      const response = await fetch("http://192.168.1.14:8000/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          engine_temperature: 115,
+          oil_pressure: 18,
+          vibration_level: 0.92,
+          rpm: 4500,
+          harsh_braking_count: 14,
+          harsh_acceleration_count: 16,
+        }),
+      });
+
+      const data = await response.json();
+      setHealthData(data);
+
+      await AsyncStorage.setItem(
+        "DETECTED_HEALTH",
+        JSON.stringify({
+          vehicleName: vehicle.name,
+          timestamp: new Date().toISOString(),
+        ...data,
+        })
+      );
+    } catch (error) {
+      setHealthData({ error: "Failed to fetch health data" });
+    } finally {
+      setLoadingHealth(false);
+    }
+  };
+
+  /* 🔹 Calendar Marks */
   const markedDates = {};
   Object.keys(appointments).forEach((date) => {
-    markedDates[date] = { marked: true, dotColor: "#000" };
+    markedDates[date] = {
+      marked: true,
+      dotColor: COLORS.primary,
+    };
   });
-
-  const onScrollEnd = (event) => {
-    const index = Math.round(
-      event.nativeEvent.contentOffset.x / width
-    );
-    setActiveCarIndex(index);
-  };
 
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.card }}>
-      {/* 🔝 TOP HEADER */}
+      {/* 🔝 HEADER */}
       <View
         style={{
           position: "absolute",
@@ -78,10 +122,11 @@ export default function HomeScreen() {
           zIndex: 10,
           flexDirection: "row",
           justifyContent: "space-between",
+          alignItems: "center",
         }}
       >
         <Text style={{ fontSize: 22, fontWeight: "600" }}>
-          Welcome, Ridhi!
+          Welcome Ridhi!
         </Text>
 
         <TouchableOpacity
@@ -97,69 +142,56 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 🚗 IMAGE CARD */}
-      <View
-        style={{
-          marginTop: 125,
-          marginHorizontal: 15,
-          borderRadius: 16,
-          backgroundColor: "#f7f7f7",
-          elevation: 4,
-          overflow: "hidden",
-        }}
-      >
-        <ScrollView
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={onScrollEnd}
-        >
-          {cars.map((car, index) => (
-            <View key={index} style={{ width }}>
-              <Image
-                source={car}
-                style={{
-                  width: "100%",
-                  height: 220,
-                  resizeMode: "cover",
-                  marginLeft: -20,
+      {/* 🚗 VEHICLE CAROUSEL */}
+      <View style={{ marginTop: 120 }}>
+        {vehicles.length > 0 ? (
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+          >
+            {vehicles.map((v) => (
+              <TouchableOpacity
+                key={v.id}
+                delayLongPress={300}
+                onLongPress={() => {
+                  setSelectedVehicle(v);
+                  setShowVehicleModal(true);
                 }}
-              />
-            </View>
-          ))}
-        </ScrollView>
-
-        {/* ◯ DOTS */}
-        <View style={{ flexDirection: "row", justifyContent: "center", marginTop: 10 }}>
-          {cars.map((_, index) => (
-            <View
-              key={index}
-              style={{
-                width: index === activeCarIndex ? 12 : 8,
-                height: index === activeCarIndex ? 12 : 8,
-                borderRadius: 6,
-                marginHorizontal: 5,
-                backgroundColor: index === activeCarIndex ? "#000" : "#aaa",
-              }}
-            />
-          ))}
-        </View>
-
-        <View style={{ height: 15 }} />
+                style={{ width, paddingHorizontal: 15 }}
+              >
+                <Image
+                  source={{ uri: v.imageUri }}
+                  style={{
+                    width: "100%",
+                    height: IMAGE_HEIGHT,
+                    borderRadius: 16,
+                  }}
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        ) : (
+          <Text style={{ textAlign: "center", marginTop: 50 }}>
+            No vehicles added yet
+          </Text>
+        )}
       </View>
 
-      {/* 🔵 HEALTH CHECK BUTTON (NEW) */}
+      {/* ❤️ HEALTH CHECK BUTTON */}
       <TouchableOpacity
-        onPress={() => {
-          setSelectedCar(null);
-          setShowHealthModal(true);
-        }}
         style={{
-          backgroundColor: "#1E90FF",
+          backgroundColor: COLORS.primary,
           padding: 14,
           borderRadius: 10,
           margin: 15,
           alignItems: "center",
+        }}
+        onPress={() => {
+          setShowHealthModal(true);
+          if (vehicles.length > 0) {
+            fetchHealthData(vehicles[0]);
+          }
         }}
       >
         <Text style={{ color: "#fff", fontWeight: "600" }}>
@@ -172,64 +204,94 @@ export default function HomeScreen() {
         <Calendar
           markedDates={markedDates}
           onDayPress={(day) => {
-            if (appointments[day.dateString]) {
-              setSelectedDate(day.dateString);
-              setShowModal(true);
-            }
+            setSelectedDate(day.dateString);
+            setShowCalendarModal(true);
           }}
         />
       </View>
 
-      {/* 🧾 APPOINTMENT MODAL */}
-      <Modal visible={showModal} transparent>
+      {/* 📆 CALENDAR MODAL */}
+      <Modal visible={showCalendarModal} transparent animationType="fade">
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center" }}>
           <View style={{ backgroundColor: "#fff", margin: 20, padding: 20, borderRadius: 12 }}>
-            <Text style={{ fontSize: 18, fontWeight: "600" }}>
-              Appointments on {selectedDate}
-            </Text>
-            {appointments[selectedDate]?.map((item, i) => (
-              <Text key={i}>• {item.time} — {item.title}</Text>
-            ))}
-            <TouchableOpacity onPress={() => setShowModal(false)}>
-              <Text style={{ color: "#007AFF", marginTop: 10 }}>Close</Text>
+            <Text style={{ fontSize: 18, fontWeight: "600" }}>{selectedDate}</Text>
+
+            {appointments[selectedDate]?.length ? (
+              appointments[selectedDate].map((a, i) => (
+                <Text key={i}>• {a.time} — {a.title}</Text>
+              ))
+            ) : (
+              <Text>No appointments</Text>
+            )}
+
+            <TouchableOpacity onPress={() => setShowCalendarModal(false)}>
+              <Text style={{ marginTop: 12 }}>Close</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* ❤️ HEALTH CHECK MODAL (NEW) */}
-      <Modal visible={showHealthModal} transparent>
+      {/* 🚗 VEHICLE DETAILS MODAL */}
+      <Modal visible={showVehicleModal} transparent animationType="fade">
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center" }}>
           <View style={{ backgroundColor: "#fff", margin: 20, padding: 20, borderRadius: 12 }}>
-            {!selectedCar ? (
-              <>
-                <Text style={{ fontSize: 18, fontWeight: "600" }}>
-                  Select Vehicle
-                </Text>
+            <Text style={{ fontSize: 18, fontWeight: "700" }}>Vehicle Details</Text>
+            <Text>🚗 {selectedVehicle?.name}</Text>
+            <Text>🔢 {selectedVehicle?.regOrEngine}</Text>
 
-                <TouchableOpacity onPress={() => setSelectedCar("Fortuner")}>
-                  <Text style={{ marginTop: 10 }}>Fortuner</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity onPress={() => setSelectedCar("Carens")}>
-                  <Text style={{ marginTop: 10 }}>Carens</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <Text style={{ fontSize: 18, fontWeight: "600" }}>
-                  {selectedCar} Health
-                </Text>
-
-                {Object.entries(healthData[selectedCar]).map(([key, val]) => (
-                  <Text key={key}>• {key}: {val}</Text>
-                ))}
-              </>
-            )}
-
-            <TouchableOpacity onPress={() => setShowHealthModal(false)}>
-              <Text style={{ color: "#007AFF", marginTop: 15 }}>Close</Text>
+            <TouchableOpacity onPress={() => setShowVehicleModal(false)}>
+              <Text style={{ marginTop: 20, color: COLORS.primary }}>Close</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ❤️ HEALTH CHECK MODAL */}
+      <Modal visible={showHealthModal} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}>
+          <View style={{ backgroundColor: "#fff", height: "70%", borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
+            <View style={{ padding: 15, borderBottomWidth: 1, borderColor: "#eee", flexDirection: "row", justifyContent: "space-between" }}>
+              <Text style={{ fontSize: 18, fontWeight: "700" }}>
+                {vehicles[activeHealthIndex]?.name || "Vehicle"}
+              </Text>
+              <TouchableOpacity onPress={() => setShowHealthModal(false)}>
+                <Text style={{ fontSize: 18 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              horizontal
+              pagingEnabled
+              onMomentumScrollEnd={(e) => {
+                const index = Math.round(e.nativeEvent.contentOffset.x / width);
+                setActiveHealthIndex(index);
+                fetchHealthData(vehicles[index]);
+              }}
+            >
+              {vehicles.map((v) => (
+                <View key={v.id} style={{ width, padding: 20 }}>
+                  <Image source={{ uri: v.imageUri }} style={{ height: 160, borderRadius: 12 }} />
+
+                  <View style={{ backgroundColor: "#f5f5f5", padding: 15, borderRadius: 12, marginTop: 20 }}>
+                    <Text style={{ fontWeight: "600" }}>Vehicle Health</Text>
+
+                    {loadingHealth && <ActivityIndicator style={{ marginTop: 20 }} />}
+
+                    {!loadingHealth && healthData && !healthData.error && (
+                      <>
+                        <Text>Engine Failure: {(healthData.engine_failure_probability * 100).toFixed(1)}%</Text>
+                        <Text>Bearing Failure: {(healthData.bearing_failure_probability * 100).toFixed(1)}%</Text>
+                        <Text>Driving Stress: {healthData.driving_stress_index}/100</Text>
+                      </>
+                    )}
+
+                    {!loadingHealth && healthData?.error && (
+                      <Text style={{ color: "red" }}>{healthData.error}</Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
           </View>
         </View>
       </Modal>

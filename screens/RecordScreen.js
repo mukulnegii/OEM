@@ -1,93 +1,241 @@
-import React from "react";
+import { useState, useCallback } from "react";
 import {
-  View,
-  Text,
-  FlatList,
   StyleSheet,
-  SafeAreaView,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-
-const RECORDS = [
-  { id: 1, title: "Engine Health Check", date: "2026-01-12" },
-  { id: 2, title: "Bearing Inspection", date: "2026-01-10" },
-  { id: 3, title: "Vehicle Stress Analysis", date: "2026-01-08" },
-  { id: 4, title: "Oil Level Service", date: "2026-01-05" },
-];
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "@react-navigation/native";
+import { COLORS } from "../constants/colors";
 
 export default function RecordScreen() {
-  const renderItem = ({ item, index }) => (
-    <View style={styles.row}>
-      <Text style={styles.cellSno}>{index + 1}</Text>
-      <Text style={styles.cellTitle}>{item.title}</Text>
-      <Text style={styles.cellDate}>{item.date}</Text>
-    </View>
+  const [activeTab, setActiveTab] = useState("service");
+  const [detectedHealth, setDetectedHealth] = useState(null);
+
+  /* 🔹 Load detected health data when screen is focused */
+  useFocusEffect(
+    useCallback(() => {
+      loadDetectedHealth();
+    }, [])
   );
+
+  const loadDetectedHealth = async () => {
+    try {
+      const data = await AsyncStorage.getItem("DETECTED_HEALTH");
+      if (data) {
+        setDetectedHealth(JSON.parse(data));
+      } else {
+        setDetectedHealth(null);
+      }
+    } catch (e) {
+      console.log("Failed to load detected health", e);
+    }
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerCellSno}>S.NO.</Text>
-        <Text style={styles.headerCellTitle}>Title</Text>
-        <Text style={styles.headerCellDate}>Date</Text>
+    <View style={styles.container}>
+      {/* 🔲 SQUARE TABS */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[
+            styles.tab,
+            activeTab === "service" && styles.activeTab,
+          ]}
+          onPress={() => setActiveTab("service")}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "service" &&
+                styles.activeTabText,
+            ]}
+          >
+            Service Record
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.tab,
+            activeTab === "detected" && styles.activeTab,
+          ]}
+          onPress={() => setActiveTab("detected")}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "detected" &&
+                styles.activeTabText,
+            ]}
+          >
+            Detected
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Records */}
-      <FlatList
-        data={RECORDS}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={renderItem}
-        contentContainerStyle={{ paddingBottom: 20 }}
-      />
-    </SafeAreaView>
+      {/* 📄 CONTENT */}
+      <View style={styles.content}>
+        {activeTab === "service" ? (
+          <View style={styles.serviceList}>
+            {/* Service 1 */}
+            <View style={styles.serviceCard}>
+              <View style={styles.serviceHeader}>
+                <Text style={styles.serviceTitle}>
+                   1st Car Service
+                </Text>
+                <Text style={styles.serviceDate}>
+                   12 Jan 2026
+                </Text>
+              </View>
+              <Text style={styles.serviceSubtitle}>
+                Routine inspection & oil change
+              </Text>
+            </View>
+
+            {/* Service 2 */}
+            <View style={styles.serviceCard}>
+              <View style={styles.serviceHeader}>
+                <Text style={styles.serviceTitle}>
+                   Brake Pads Replacement
+                </Text>
+                <Text style={styles.serviceDate}>
+                   15 Jan 2026
+                </Text>
+              </View>
+              <Text style={styles.serviceSubtitle}>
+                Front & rear brake pads replaced
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.detectedBox}>
+            {detectedHealth ? (
+              <>
+                <Text style={styles.vehicleName}>
+                  🚗 {detectedHealth.vehicleName}
+                </Text>
+
+                <Text style={styles.detectedText}>
+                  Engine Failure Probability:{" "}
+                  {(detectedHealth.engine_failure_probability * 100).toFixed(1)}%
+                </Text>
+
+                <Text style={styles.detectedText}>
+                  Bearing Failure Probability:{" "}
+                  {(detectedHealth.bearing_failure_probability * 100).toFixed(1)}%
+                </Text>
+
+                <Text style={styles.detectedText}>
+                  Driving Stress Index:{" "}
+                  {detectedHealth.driving_stress_index}/100
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.noDataText}>
+                No detected health data yet
+              </Text>
+            )}
+          </View>
+        )}
+      </View>
+    </View>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
-    paddingTop: 50,
-    paddingHorizontal: 10,
+    paddingTop: 65,
+    paddingHorizontal: 16,
   },
-  header: {
+
+  /* Tabs */
+  tabContainer: {
     flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 30,
+  },
+  tab: {
+    width: "48%",
+    height: 60,
+    borderRadius: 12,
     backgroundColor: "#F1F5F9",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  headerCellSno: {
-    width: "15%",
-    fontWeight: "bold",
-    textAlign: "center",
+  activeTab: {
+    backgroundColor: COLORS.primary,
   },
-  headerCellTitle: {
-    width: "55%",
-    fontWeight: "bold",
+  tabText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#475569",
   },
-  headerCellDate: {
-    width: "30%",
-    fontWeight: "bold",
-    textAlign: "center",
+  activeTabText: {
+    color: "#fff",
   },
-  row: {
+
+  /* Content */
+  content: {
+    flex: 1,
+    alignItems: "center",
+  },
+
+  /* Service Records */
+  serviceList: {
+    width: "100%",
+  },
+  serviceCard: {
+    backgroundColor: "#F8FAFC",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 14,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary,
+  },
+  serviceHeader: {
     flexDirection: "row",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
   },
-  cellSno: {
-    width: "15%",
-    textAlign: "center",
-    color: "#334155",
-  },
-  cellTitle: {
-    width: "55%",
+  serviceTitle: {
+    fontSize: 15,
+    fontWeight: "700",
     color: "#0F172A",
   },
-  cellDate: {
-    width: "30%",
-    textAlign: "center",
+  serviceDate: {
+    fontSize: 12,
+    color: "#64748B",
+  },
+  serviceSubtitle: {
+    fontSize: 13,
     color: "#475569",
+  },
+
+  /* Detected */
+  detectedBox: {
+    backgroundColor: "#F8FAFC",
+    padding: 20,
+    borderRadius: 12,
+    width: "100%",
+  },
+  vehicleName: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 12,
+    color: "#0F172A",
+  },
+  detectedText: {
+    fontSize: 14,
+    marginBottom: 8,
+    color: "#1E293B",
+  },
+  noDataText: {
+    fontSize: 14,
+    color: "#64748B",
+    textAlign: "center",
   },
 });

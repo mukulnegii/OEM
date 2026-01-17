@@ -3,9 +3,9 @@ import { Text } from "react-native";
 import { COLORS } from "../constants/colors";
 import HelpDeskScreen from "../screens/HelpDeskScreen";
 import HomeScreen from "../screens/HomeScreen";
-import ProfileScreen from "../screens/ProfileScreen";
 import RecordScreen from "../screens/RecordScreen";
 import SearchScreen from "../screens/SearchScreen";
+import ScheduleScreen from "../screens/ScheduleScreen";
 const Tab = createBottomTabNavigator();
 
 export default function BottomTabs() {
@@ -40,9 +40,9 @@ export default function BottomTabs() {
 />
 
 <Tab.Screen
-  name="Profile"
-  component={ProfileScreen}
-  options={{ tabBarIcon: () => <Text style={{ color: COLORS.primary }}>🙎‍♂️</Text> }}
+  name="Schedule"
+  component={ScheduleScreen}
+  options={{ tabBarIcon: () => <Text style={{ color: COLORS.primary }}>🗓️</Text> }}
 />
 
 <Tab.Screen
